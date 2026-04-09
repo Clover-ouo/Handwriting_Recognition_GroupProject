@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic-settings
+python-multipart
+torch
+torchvision
+Pillow
+numpy
+pyttsx3
+httpx
