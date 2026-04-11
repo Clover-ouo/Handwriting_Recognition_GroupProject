@@ -12,6 +12,7 @@ from uuid import uuid4
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from PIL import Image, UnidentifiedImageError
 from pydantic import ValidationError
@@ -98,6 +99,13 @@ app = FastAPI(
     title=SETTINGS.app_name,
     version=SETTINGS.api_version,
     description="API for handwritten formula recognition.",
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=SETTINGS.cors_allow_origins_list(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

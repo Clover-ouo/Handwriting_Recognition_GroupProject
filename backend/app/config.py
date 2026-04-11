@@ -21,6 +21,9 @@ DEFAULT_APP_NAME = "Formula Recognition API"  # Display name for the FastAPI app
 DEFAULT_API_PREFIX = "/api/v1"  # Base prefix for API routes (leading slash required).
 DEFAULT_API_VERSION = "0.1.0"  # Semantic version for the API service.
 DEFAULT_LOG_LEVEL = "INFO"  # Logging level string (INFO, DEBUG, WARNING, ERROR).
+DEFAULT_CORS_ALLOW_ORIGINS = (
+    "http://localhost:5173,http://127.0.0.1:5173"
+)  # Comma-separated frontend origins.
 DEFAULT_LOG_SEPARATOR_LENGTH = 80  # Length of log separator lines (>= 10).
 DEFAULT_DURATION_DECIMALS = 2  # Decimal places for timing logs (0-6 recommended).
 
@@ -105,6 +108,10 @@ class Settings(BaseSettings):
     api_prefix: str = Field(default=DEFAULT_API_PREFIX, description="Base prefix for API routes.")
     api_version: str = Field(default=DEFAULT_API_VERSION, description="API semantic version.")
     log_level: str = Field(default=DEFAULT_LOG_LEVEL, description="Logging level string.")
+    cors_allow_origins: str = Field(
+        default=DEFAULT_CORS_ALLOW_ORIGINS,
+        description="Comma-separated allowed CORS origins for browser clients.",
+    )
     log_separator_length: int = Field(
         default=DEFAULT_LOG_SEPARATOR_LENGTH,
         description="Length of log separator lines.",
@@ -219,6 +226,10 @@ class Settings(BaseSettings):
     def allowed_image_types_list(self) -> List[str]:
         """Return allowed MIME types as a list."""
         return [item.strip() for item in self.allowed_image_types.split(",") if item.strip()]
+
+    def cors_allow_origins_list(self) -> List[str]:
+        """Return allowed CORS origins as a list."""
+        return [item.strip() for item in self.cors_allow_origins.split(",") if item.strip()]
 
     def allowed_image_extensions_list(self) -> List[str]:
         """Return allowed file extensions as a list."""

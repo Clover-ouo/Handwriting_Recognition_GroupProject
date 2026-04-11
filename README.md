@@ -5,7 +5,7 @@
 | Component | Description |
 | --- | --- |
 | Backend (FastAPI, Python 3.11.0) | Image → LaTeX (`/api/v1/latex/from-image`), LaTeX → spoken sentence (`/api/v1/speech-text/from-latex`), Text → speech audio (`/api/v1/speech/from-text`), Voice list (`/api/v1/speech/voices`). |
-| Frontend (React + TypeScript) | Placeholder for UI integration. |
+| Frontend (React + TypeScript) | Integrated UI in `frontend\` with draw/upload/camera input, backend API calls, and A.html-style TTS panel using browser speech playback. |
 | Model assets | Stored under `OtherInfo\ModelCode\model\checkpoints`. |
 | Storage | Uploaded images: `uploaded_documents`; generated audio: `generated_audio`. |
 
@@ -23,6 +23,13 @@ Install backend dependencies:
 ```
 cd backend
 pip install -r requirements.txt
+```
+
+Install frontend dependencies:
+
+```
+cd ..\frontend
+npm install
 ```
 
 ## Model placement
@@ -46,6 +53,13 @@ Copy `backend\.env.example` to `backend\.env` and set:
 
 - **LLM settings**: `LLM_PROVIDER`, `LLM_MODEL` (or `LLM_DEFAULT_MODEL`), and provider API keys
 - **TTS settings**: `TTS_DEFAULT_LANGUAGE`, `TTS_VOICE_ID` (optional), `TTS_RATE`, `TTS_VOLUME`
+- **CORS**: `CORS_ALLOW_ORIGINS` to include your frontend dev origin(s)
+
+Copy `frontend\.env.example` to `frontend\.env` and set:
+
+- `VITE_API_BASE_URL` (backend host)
+- `VITE_API_PREFIX` (usually `/api/v1`)
+- `VITE_TTS_DEFAULT_LANGUAGE` (e.g. `en`)
 
 For local OpenAI-compatible servers, set `LLM_PROVIDER=local` and `OPENAI_API_BASE`.
 
@@ -53,6 +67,13 @@ For local OpenAI-compatible servers, set `LLM_PROVIDER=local` and `OPENAI_API_BA
 
 ```
 uvicorn app.main:app --reload
+```
+
+## Run the frontend
+
+```
+cd frontend
+npm run dev
 ```
 
 ## API usage
