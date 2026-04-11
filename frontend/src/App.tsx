@@ -14,11 +14,9 @@ import { ImageUploader } from './components/ImageUploader';
 import { CameraCapture } from './components/CameraCapture';
 import { ResultArea } from './components/ResultArea';
 import { HistoryPanel } from './components/HistoryPanel';
-import { TtsPanel } from './components/TtsPanel';
 import { UI_CONSTANTS } from './config/constants';
 import {
   ApiClientError,
-  appEnv,
   convertLatexToSpeechText,
   inferLatexFromImage,
 } from './services/apiClient';
@@ -103,14 +101,6 @@ export default function App() {
         speak(`Error. ${message}`);
       }
     }
-  };
-
-  const onConvertAndSpeakLatex = async (latex: string) => {
-    const speechResponse = await convertLatexToSpeechText(
-      latex,
-      appEnv.ttsDefaultLanguage,
-    );
-    speak(speechResponse.sentence);
   };
 
   const isRecognizeDisabled = status === 'recognizing' || !activeImageFile;
@@ -268,11 +258,6 @@ export default function App() {
               status={statusText}
             />
           )}
-
-          <TtsPanel
-            onConvertAndSpeakLatex={onConvertAndSpeakLatex}
-            onSpeakTextDirectly={speak}
-          />
         </main>
 
         <HistoryPanel

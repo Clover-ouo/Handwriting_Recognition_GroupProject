@@ -284,6 +284,11 @@ async def infer_latex_from_image(
         target_width=target_width,
         max_len=settings.max_decode_len,
     )
+    logger.info(
+        "📄 [INFERENCE_RESULT] request_id=%s | latex=%s",
+        request_id,
+        latex,
+    )
     duration_ms = _get_duration_ms(request) or DEFAULT_DURATION_MS
     log_endpoint_success(
         logger=logger,
@@ -492,6 +497,14 @@ async def convert_latex_to_speech_text(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail={"code": ERROR_CODE_LLM_RESPONSE, "message": str(exc)},
         ) from exc
+    logger.info(
+        "📝 [LLM_RESULT] request_id=%s | latex=%s | sentence=%s | provider=%s | model=%s",
+        request_id,
+        payload.latex,
+        result.text,
+        result.provider,
+        result.model,
+    )
     duration_ms = _get_duration_ms(request) or DEFAULT_DURATION_MS
     log_endpoint_success(
         logger=logger,

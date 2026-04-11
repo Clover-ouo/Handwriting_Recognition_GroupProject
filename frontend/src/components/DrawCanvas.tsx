@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent, TouchEvent } from 'react';
 import { Pen, Trash2 } from 'lucide-react';
-import { UI_CONSTANTS } from '../config/constants';
 
 interface DrawCanvasProps {
   onImageReady: (file: File | null) => void;
@@ -11,34 +10,53 @@ interface DrawCanvasProps {
 
 export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
 
-  useEffect(() => {
+  const setupContext = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return null;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.lineWidth = 4;
     ctx.strokeStyle = '#000000';
+    return ctx;
+  };
+
+  useEffect(() => {
+    setupContext();
   }, []);
 
   useEffect(() => {
     const resizeCanvas = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      if (canvas.width === 0) {
-        canvas.width = parent.clientWidth;
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const nextWidth = Math.max(1, Math.floor(rect.width * dpr));
+      const nextHeight = Math.max(1, Math.floor(rect.height * dpr));
+      if (canvas.width === nextWidth && canvas.height === nextHeight) return;
+
+      const previous = document.createElement('canvas');
+      previous.width = canvas.width;
+      previous.height = canvas.height;
+      const previousCtx = previous.getContext('2d');
+      if (previousCtx) {
+        previousCtx.drawImage(canvas, 0, 0);
       }
-      if (canvas.height === 0) {
-        const isMobile = window.innerWidth <= 768;
-        canvas.height = isMobile
-          ? UI_CONSTANTS.DRAW_CANVAS_HEIGHT_MOBILE
-          : UI_CONSTANTS.DRAW_CANVAS_HEIGHT_DESKTOP;
+
+      canvas.width = nextWidth;
+      canvas.height = nextHeight;
+
+      const ctx = setupContext();
+      if (!ctx) return;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
+      if (previous.width > 0 && previous.height > 0) {
+        ctx.drawImage(previous, 0, 0, rect.width, rect.height);
       }
     };
     resizeCanvas();
@@ -79,10 +97,7 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
     event.preventDefault();
     const coords = getCoordinates(event);
     if (!coords) return;
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
-    ctx.beginPath();
-    ctx.moveTo(coords.x, coords.y);
+    lastPointRef.current = coords;
     setIsDrawing(true);
     if (isEmpty) {
       setIsEmpty(false);
@@ -98,9 +113,12 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
     if (!coords) return;
     const ctx = canvasRef.current?.getContext('2d');
     if (!ctx) return;
+    const from = lastPointRef.current ?? coords;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
     ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
-    toFile();
+    lastPointRef.current = coords;
   };
 
   const stopDrawing = () => {
@@ -109,6 +127,7 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
       ctx.closePath();
     }
     setIsDrawing(false);
+    lastPointRef.current = null;
     if (!isEmpty) {
       toFile();
     }
