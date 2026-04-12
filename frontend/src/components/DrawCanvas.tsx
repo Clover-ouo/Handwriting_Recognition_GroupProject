@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent, TouchEvent } from 'react';
-import { Pen, Trash2 } from 'lucide-react';
+import { Pen, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { UI_CONSTANTS } from '../config/constants';
 
 interface DrawCanvasProps {
@@ -12,8 +12,13 @@ interface DrawCanvasProps {
 export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+  const undoStackRef = useRef<string[]>([]);
+  const redoStackRef = useRef<string[]>([]);
+  const blankSnapshotRef = useRef<string>('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
 
   const setupContext = () => {
     const canvas = canvasRef.current;
@@ -25,6 +30,68 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
     ctx.lineWidth = UI_CONSTANTS.DRAW_STROKE_WIDTH;
     ctx.strokeStyle = UI_CONSTANTS.DRAW_STROKE_COLOR;
     return ctx;
+  };
+
+  const updateHistoryState = () => {
+    setCanUndo(undoStackRef.current.length > 1);
+    setCanRedo(redoStackRef.current.length > 0);
+  };
+
+  const updateImageOutputBySnapshot = () => {
+    const current = undoStackRef.current[undoStackRef.current.length - 1] ?? '';
+    if (!current || current === blankSnapshotRef.current) {
+      setIsEmpty(true);
+      onImageReady(null);
+      return;
+    }
+    setIsEmpty(false);
+    toFile();
+  };
+
+  const drawSnapshotToCanvas = (snapshot: string, onDone?: () => void) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = canvas.width / dpr;
+    const displayHeight = canvas.height / dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = UI_CONSTANTS.DRAW_BACKGROUND_FILL;
+    ctx.fillRect(0, 0, displayWidth, displayHeight);
+    if (snapshot === blankSnapshotRef.current) {
+      if (onDone) {
+        onDone();
+      }
+      return;
+    }
+    const image = new Image();
+    image.onload = () => {
+      ctx.drawImage(image, 0, 0, displayWidth, displayHeight);
+      if (onDone) {
+        onDone();
+      }
+    };
+    image.src = snapshot;
+  };
+
+  const captureSnapshot = (): string => {
+    const canvas = canvasRef.current;
+    if (!canvas) return '';
+    return canvas.toDataURL('image/png');
+  };
+
+  const commitSnapshot = () => {
+    const snapshot = captureSnapshot();
+    if (!snapshot) return;
+    const last = undoStackRef.current[undoStackRef.current.length - 1];
+    if (snapshot === last) return;
+    undoStackRef.current.push(snapshot);
+    redoStackRef.current = [];
+    updateHistoryState();
+    updateImageOutputBySnapshot();
   };
 
   useEffect(() => {
@@ -61,11 +128,18 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
       if (previous.width > 0 && previous.height > 0) {
         ctx.drawImage(previous, 0, 0, rect.width, rect.height);
       }
+      const initial = captureSnapshot();
+      blankSnapshotRef.current = initial;
+      undoStackRef.current = [initial];
+      redoStackRef.current = [];
+      updateHistoryState();
+      onImageReady(null);
+      setIsEmpty(true);
     };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
     return () => window.removeEventListener('resize', resizeCanvas);
-  }, []);
+  }, [onImageReady]);
 
   const toFile = () => {
     const canvas = canvasRef.current;
@@ -140,7 +214,7 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
     setIsDrawing(false);
     lastPointRef.current = null;
     if (!isEmpty) {
-      toFile();
+      commitSnapshot();
     }
   };
 
@@ -155,11 +229,37 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = UI_CONSTANTS.DRAW_BACKGROUND_FILL;
     ctx.fillRect(0, 0, displayWidth, displayHeight);
+    const blankSnapshot = captureSnapshot();
+    blankSnapshotRef.current = blankSnapshot;
+    undoStackRef.current = [blankSnapshot];
+    redoStackRef.current = [];
+    updateHistoryState();
     setIsEmpty(true);
     onImageReady(null);
     if (voiceGuidance) {
       speak('Canvas cleared');
     }
+  };
+
+  const undo = () => {
+    if (undoStackRef.current.length <= 1) return;
+    const current = undoStackRef.current.pop();
+    if (current) {
+      redoStackRef.current.push(current);
+    }
+    const previous = undoStackRef.current[undoStackRef.current.length - 1];
+    if (previous) {
+      drawSnapshotToCanvas(previous, updateImageOutputBySnapshot);
+    }
+    updateHistoryState();
+  };
+
+  const redo = () => {
+    const next = redoStackRef.current.pop();
+    if (!next) return;
+    undoStackRef.current.push(next);
+    drawSnapshotToCanvas(next, updateImageOutputBySnapshot);
+    updateHistoryState();
   };
 
   return (
@@ -193,7 +293,25 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={undo}
+          disabled={!canUndo}
+          className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Undo"
+        >
+          <Undo2 size={16} />
+          Undo
+        </button>
+        <button
+          onClick={redo}
+          disabled={!canRedo}
+          className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label="Redo"
+        >
+          <Redo2 size={16} />
+          Redo
+        </button>
         <button
           onClick={clearCanvas}
           disabled={isEmpty}

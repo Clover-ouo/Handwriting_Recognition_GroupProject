@@ -11,48 +11,95 @@ interface CameraCaptureProps {
 export function CameraCapture({ onPhotoCapture, voiceGuidance, speak }: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const stopCamera = useCallback(() => {
-    if (!stream) return;
-    stream.getTracks().forEach((track) => track.stop());
-    setStream(null);
-  }, [stream]);
+    if (!streamRef.current) return;
+    streamRef.current.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const attachStreamToVideo = async (mediaStream: MediaStream): Promise<void> => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.srcObject = mediaStream;
+    await new Promise<void>((resolve) => {
+      const onReady = () => {
+        video.removeEventListener('loadedmetadata', onReady);
+        resolve();
+      };
+      video.addEventListener('loadedmetadata', onReady);
+      window.setTimeout(() => {
+        video.removeEventListener('loadedmetadata', onReady);
+        resolve();
+      }, 1200);
+    });
+    await video.play().catch(() => {
+      // Some browsers block autoplay; stream can still be displayed once user interacts.
+    });
+  };
+
+  const requestStream = async (): Promise<MediaStream> => {
+    const mediaDevices = navigator.mediaDevices;
+    if (!mediaDevices?.getUserMedia) {
+      throw new Error('Camera API is not supported in this browser.');
+    }
+    const constraintsCandidates: MediaStreamConstraints[] = [
+      { video: { facingMode: 'environment' }, audio: false },
+      { video: true, audio: false },
+    ];
+    let lastError: unknown = null;
+    for (const constraints of constraintsCandidates) {
+      try {
+        return await mediaDevices.getUserMedia(constraints);
+      } catch (errorObject) {
+        lastError = errorObject;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('No camera stream available from current browser/device.');
+  };
 
   const startCamera = useCallback(async () => {
     setError(null);
+    stopCamera();
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-      });
-      setStream(mediaStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      const mediaStream = await requestStream();
+      streamRef.current = mediaStream;
+      await attachStreamToVideo(mediaStream);
       if (voiceGuidance) {
         speak('Camera started. Align your formula and click capture.');
       }
-    } catch {
-      setError('Failed to access camera. Please check permissions.');
+    } catch (errorObject) {
+      const message = errorObject instanceof Error ? errorObject.message : 'Unknown camera error.';
+      const normalizedMessage = `Failed to access camera. ${message}`;
+      console.error('Camera start failed:', errorObject);
+      setPhoto(null);
+      setError(message);
       if (voiceGuidance) {
-        speak('Failed to access camera. Please check permissions.');
+        speak(normalizedMessage);
       }
     }
-  }, [speak, voiceGuidance]);
+  }, [speak, stopCamera, voiceGuidance]);
 
   useEffect(() => {
-    startCamera();
-    return () => {
-      stopCamera();
-    };
+    void startCamera();
+    return () => stopCamera();
   }, [startCamera, stopCamera]);
 
   const capturePhoto = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
+    if (!video || !canvas || video.videoWidth === 0 || video.videoHeight === 0) {
+      setError('Camera is not ready yet. Please wait a moment and try again.');
+      return;
+    }
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
