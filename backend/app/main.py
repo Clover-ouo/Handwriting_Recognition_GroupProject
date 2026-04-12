@@ -687,6 +687,10 @@ def _load_image(data: bytes) -> Image.Image:
     """Load a PIL image from raw bytes."""
     try:
         image = Image.open(BytesIO(data))
+        if "A" in image.getbands():
+            background = Image.new("RGBA", image.size, (255, 255, 255, 255))
+            image = Image.alpha_composite(background, image.convert("RGBA")).convert("RGB")
+            return image
         return image.convert("RGB")
     except (UnidentifiedImageError, OSError) as exc:
         raise HTTPException(

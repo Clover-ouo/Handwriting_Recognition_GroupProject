@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent, TouchEvent } from 'react';
 import { Pen, Trash2 } from 'lucide-react';
+import { UI_CONSTANTS } from '../config/constants';
 
 interface DrawCanvasProps {
   onImageReady: (file: File | null) => void;
@@ -21,8 +22,8 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
     if (!ctx) return null;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = UI_CONSTANTS.DRAW_STROKE_WIDTH;
+    ctx.strokeStyle = UI_CONSTANTS.DRAW_STROKE_COLOR;
     return ctx;
   };
 
@@ -55,6 +56,8 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
       if (!ctx) return;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
+      ctx.fillStyle = UI_CONSTANTS.DRAW_BACKGROUND_FILL;
+      ctx.fillRect(0, 0, rect.width, rect.height);
       if (previous.width > 0 && previous.height > 0) {
         ctx.drawImage(previous, 0, 0, rect.width, rect.height);
       }
@@ -67,7 +70,15 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
   const toFile = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.toBlob((blob) => {
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const exportCtx = exportCanvas.getContext('2d');
+    if (!exportCtx) return;
+    exportCtx.fillStyle = UI_CONSTANTS.DRAW_BACKGROUND_FILL;
+    exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+    exportCtx.drawImage(canvas, 0, 0);
+    exportCanvas.toBlob((blob) => {
       if (!blob) return;
       onImageReady(new File([blob], 'drawn-formula.png', { type: 'image/png' }));
     }, 'image/png');
@@ -138,7 +149,12 @@ export function DrawCanvas({ onImageReady, voiceGuidance, speak }: DrawCanvasPro
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = canvas.width / dpr;
+    const displayHeight = canvas.height / dpr;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = UI_CONSTANTS.DRAW_BACKGROUND_FILL;
+    ctx.fillRect(0, 0, displayWidth, displayHeight);
     setIsEmpty(true);
     onImageReady(null);
     if (voiceGuidance) {
