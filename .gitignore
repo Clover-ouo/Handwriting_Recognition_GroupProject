@@ -14,5 +14,12 @@ logs/
 
 # Other files
 OtherInfo/
+uploaded_documents/
+generated_audio/
+
+# Virtual environments
+.venv/
+venv/
 
 
+frontend/node_modules
