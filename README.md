@@ -136,3 +136,11 @@ curl "http://127.0.0.1:8000/api/v1/speech/voices"
 ```
 
 Backend details and API docs are also available at `http://127.0.0.1:8000/docs`.
+
+## Development team (EE4016 Group 2)
+- Developer: 
+   - Clover (Leader): Mainly responsible for front-end and back-end development and assisting in model training.
+   - Ada: Search for training data set
+   - Carrie: Mainly responsible for model training
+   - Eynuce: Mainly responsible for the front-end text-to-speech module and assisting in model training.
+   - Kelly: Mainly responsible for model training, and also part of the front-end and back-end work.
